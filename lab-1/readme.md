@@ -1,6 +1,6 @@
 # Specs
 
-Increase and decrease a variable on different threads 100.000.000 times. Record its final value.
+Increase and decrease a variable on different threads 1.000.000 times. Record its final value.
 
 # Code
 
@@ -30,7 +30,7 @@ class IThread extends Thread {
     }
 
     public void run() {
-        for (int i = 0; i < 100_000_000; i++) {
+        for (int i = 0; i < 1_000_000; i++) {
             _counter.inc();
         }
     }
@@ -45,7 +45,7 @@ class DThread extends Thread {
     }
 
     public void run() {
-        for (int i = 0; i < 100_000_000; i++) {
+        for (int i = 0; i < 1_000_000; i++) {
             _counter.dec();
         }
 
@@ -77,11 +77,9 @@ class Counter {
 
 100 runs have been recorded.
 
-The following graphs illustrate the final value of the counter. On most runs, the value ends up somewhere around the ~5000 region. The average is `5189.97`.
+The following graphs illustrate the final value of the counter. On most runs, the value ends up somewhere around the ~5000 region. The average is `-12920.24`.
 
 ![](./histogram.png)
-
-![](./points.png)
 
 The final value is non-deterministic, as the code is not thread-safe. Two threads access read and modify the same variable at once without any synchronization.
 
@@ -91,3 +89,26 @@ For example, the following behavior may happen:
 2. Thread `D` (Decrementing) reads the counter's value, which is `0`, as thread `I` has not written the decremented value to the shared memory yet.
 3. Thread `D` writes `-1` to the counter's value.
 4. Thread `I` writes `1` to the counter's value.
+
+# Locking
+
+To solve the problem above, a simple lock based on an `AtomicBoolean` is written:
+
+```java
+class Lock {
+    private AtomicBoolean isLocked = new AtomicBoolean(false);
+
+    public void lock() {
+        while (!isLocked.weakCompareAndSetAcquire(false, true))
+            Thread.yield();
+    }
+
+    public void unlock() {
+        isLocked.set(false);
+    }
+}
+```
+
+Initially, the code used `compareAndSet` instead of `weakCompareAndSetAcquire`. However, `compareAndSet` did not work entirely, even though it did bring the final value of the counter closer to zero.
+
+It is yet to be investigated why `weakCompareAndSetAcquire` works, while `compareAndSet` doesn't.
