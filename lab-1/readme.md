@@ -1,3 +1,11 @@
+# Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Specs](#specs)
+- [Code](#code)
+- [Results](#results)
+- [Locking](#locking)
+
 # Specs
 
 Increase and decrease a variable on different threads 1.000.000 times. Record its final value.
@@ -77,7 +85,7 @@ class Counter {
 
 100 runs have been recorded.
 
-The following graphs illustrate the final value of the counter. On most runs, the value ends up somewhere around the ~5000 region. The average is `-12920.24`.
+The following graph illustrates the final value of the counter. The average value is `-12920.24`.
 
 ![](./histogram.png)
 
@@ -95,6 +103,98 @@ For example, the following behavior may happen:
 To solve the problem above, a simple lock based on an `AtomicBoolean` is written:
 
 ```java
+class Lock {
+    private AtomicBoolean isLocked = new AtomicBoolean(false);
+
+    public void lock() {
+        while (!isLocked.weakCompareAndSetAcquire(false, true))
+            Thread.yield();
+    }
+
+    public void unlock() {
+        isLocked.set(false);
+    }
+}
+```
+
+And the entire program looks as follows:
+
+```java
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class Race {
+    public static void main(String[] args) throws Exception {
+        Counter counter = new Counter(0);
+
+        var iThread = new IThread(counter);
+        iThread.start();
+
+        var dThread = new DThread(counter);
+        dThread.start();
+
+        iThread.join();
+        dThread.join();
+
+        System.out.println(counter.value());
+    }
+}
+
+class IThread extends Thread {
+
+    Counter _counter;
+
+    public IThread(Counter counter) {
+        _counter = counter;
+    }
+
+    public void run() {
+        for (int i = 0; i < 1_000_000; i++) {
+            _counter.inc();
+        }
+    }
+}
+
+class DThread extends Thread {
+
+    Counter _counter;
+
+    public DThread(Counter counter) {
+        _counter = counter;
+    }
+
+    public void run() {
+        for (int i = 0; i < 1_000_000; i++) {
+            _counter.dec();
+        }
+
+    }
+}
+
+class Counter {
+    private int _val;
+    private Lock _lock = new Lock();
+
+    public Counter(int n) {
+        _val = n;
+    }
+
+    public void inc() {
+        _lock.lock();
+        _val++;
+        _lock.unlock();
+    }
+
+    public void dec() {
+        _lock.lock();
+        _val--;
+        _lock.unlock();
+    }
+
+    public int value() {
+        return _val;
+    }
+}
+
 class Lock {
     private AtomicBoolean isLocked = new AtomicBoolean(false);
 

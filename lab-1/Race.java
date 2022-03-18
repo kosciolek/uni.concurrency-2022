@@ -57,15 +57,15 @@ class Counter {
     }
 
     public void inc() {
-        //_lock.lock();
+        _lock.lock();
         _val++;
-        //_lock.unlock();
+        _lock.unlock();
     }
 
     public void dec() {
-        //_lock.lock();
+        _lock.lock();
         _val--;
-        //_lock.unlock();
+        _lock.unlock();
     }
 
     public int value() {
